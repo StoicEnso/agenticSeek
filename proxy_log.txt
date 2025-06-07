@@ -1,0 +1,48 @@
+INFO:     Started server process [36684]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:3333 (Press CTRL+C to quit)
+Azure client initialized successfully
+Starting Azure DeepSeek-R1 proxy server...
+Azure Endpoint: https://ai-ouchyoakaz2002ai109957169787.services.ai.azure.com/models
+Model: DeepSeek-R1
+Listening on: http://0.0.0.0:3333
+INFO:     127.0.0.1:54663 - "POST /v1/chat/completions HTTP/1.1" 200 OK
+/Users/ihusan/Documents/GitHub/agenticSeek/azure_server_adapterv2.py:387: PydanticDeprecatedSince20: The `dict` method is deprecated; use `model_dump` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+  print(f"DEBUG GENERATE: Converted to internal format: {[m.dict() for m in msg_objects]}")
+DEBUG GENERATE: Received generate request with payload: {'messages': [{'role': 'system', 'content': 'You are a helpful assistant.'}, {'role': 'user', 'content': 'Tell me a joke.'}]}
+DEBUG GENERATE: Extracted messages: [{'role': 'system', 'content': 'You are a helpful assistant.'}, {'role': 'user', 'content': 'Tell me a joke.'}]
+DEBUG GENERATE: Converted to internal format: [{'role': 'system', 'content': 'You are a helpful assistant.'}, {'role': 'user', 'content': 'Tell me a joke.'}]
+DEBUG: Starting Azure API call with messages: ['You are a helpful assistant.', 'Tell me a joke.']
+DEBUG: Set generation state to started
+DEBUG: Sending request to Azure AI Foundry with model DeepSeek-R1
+DEBUG GENERATE: Started background thread for generation
+INFO:     127.0.0.1:54728 - "POST /generate HTTP/1.1" 202 Accepted
+DEBUG POLL: Returning response: {'sentence': '', 'is_complete': False, 'error': None}
+INFO:     127.0.0.1:54782 - "GET /get_updated_sentence HTTP/1.1" 200 OK
+DEBUG POLL: Returning response: {'sentence': '', 'is_complete': False, 'error': None}
+INFO:     127.0.0.1:54841 - "GET /get_updated_sentence HTTP/1.1" 200 OK
+DEBUG: Received response from Azure: <think>
+Okay, the user asked for a joke. Let me think of a good one. I want it to be light-hearted a...
+DEBUG: Extracted final answer: 'Why don’t skeletons fight each other?  
+Because they don’t have the *guts*! 😄  
+
+(And if they did, it’d be a *bone*-afide disaster.)'
+DEBUG: Set generation state to complete
+DEBUG GENERATE: Received generate request with payload: {'messages': [{'role': 'system', 'content': 'You are a helpful assistant.'}, {'role': 'user', 'content': 'Tell me a short joke.'}]}
+DEBUG GENERATE: Extracted messages: [{'role': 'system', 'content': 'You are a helpful assistant.'}, {'role': 'user', 'content': 'Tell me a short joke.'}]
+DEBUG GENERATE: Converted to internal format: [{'role': 'system', 'content': 'You are a helpful assistant.'}, {'role': 'user', 'content': 'Tell me a short joke.'}]
+DEBUG: Starting Azure API call with messages: ['You are a helpful assistant.', 'Tell me a short joke.']
+DEBUG: Set generation state to started
+DEBUG: Sending request to Azure AI Foundry with model DeepSeek-R1
+DEBUG GENERATE: Started background thread for generation
+INFO:     127.0.0.1:55166 - "POST /generate HTTP/1.1" 202 Accepted
+DEBUG POLL: Returning response: {'sentence': '', 'is_complete': False, 'error': None}
+INFO:     127.0.0.1:55222 - "GET /get_updated_sentence HTTP/1.1" 200 OK
+DEBUG: Received response from Azure: <think>
+Okay, the user asked for a short joke. Let me think of something simple and lighthearted. Ma...
+DEBUG: Extracted final answer: 'Why don’t skeletons fight each other?  
+…They don’t have the *guts*! 😄'
+DEBUG: Set generation state to complete
+DEBUG POLL: Returning response: {'sentence': 'Why don’t skeletons fight each other?  \n…They don’t have the *guts*! 😄', 'is_complete': True, 'error': None}
+INFO:     127.0.0.1:55310 - "GET /get_updated_sentence HTTP/1.1" 200 OK

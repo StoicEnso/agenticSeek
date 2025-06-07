@@ -115,36 +115,71 @@ class Provider:
         route_setup = f"{self.server_ip}/setup"
         route_gen = f"{self.server_ip}/generate"
 
+        print(f"CLIENT DEBUG: Using server at {self.server_ip}")
+        print(f"CLIENT DEBUG: History: {history}")
+
         if not self.is_ip_online(self.server_ip):
             pretty_print(f"Server is offline at {self.server_ip}", color="failure")
 
         try:
-            requests.post(route_setup, json={"model": self.model})
-            requests.post(route_gen, json={"messages": history})
+            # Setup connection
+            setup_response = requests.post(route_setup, json={"model": self.model})
+            print(f"CLIENT DEBUG: Setup response: {setup_response.status_code} - {setup_response.text}")
+            
+            # Generate request
+            gen_response = requests.post(route_gen, json={"messages": history})
+            print(f"CLIENT DEBUG: Generate response: {gen_response.status_code} - {gen_response.text}")
+            
             is_complete = False
+            poll_count = 0
+            
             while not is_complete:
                 try:
+                    poll_count += 1
+                    print(f"CLIENT DEBUG: Polling attempt {poll_count}")
+                    
                     response = requests.get(f"{self.server_ip}/get_updated_sentence")
-                    if "error" in response.json():
-                        pretty_print(response.json()["error"], color="failure")
+                    print(f"CLIENT DEBUG: Poll response: {response.status_code} - {response.text}")
+                    
+                    response_json = response.json()
+                    
+                    if "error" in response_json and response_json["error"]:
+                        pretty_print(f"Error from server: {response_json['error']}", color="failure")
+                        print(f"CLIENT DEBUG: Error received from server: {response_json['error']}")
                         break
-                    thought = response.json()["sentence"]
-                    is_complete = bool(response.json()["is_complete"])
+                    
+                    thought = response_json["sentence"]
+                    print(f"CLIENT DEBUG: Current thought: '{thought}'")
+                    
+                    is_complete = bool(response_json["is_complete"])
+                    print(f"CLIENT DEBUG: Is complete: {is_complete}")
+                    
+                    if is_complete:
+                        print(f"CLIENT DEBUG: Final response: '{thought}'")
+                        break
+                    
                     time.sleep(2)
                 except requests.exceptions.RequestException as e:
                     pretty_print(f"HTTP request failed: {str(e)}", color="failure")
+                    print(f"CLIENT DEBUG ERROR: HTTP request failed: {str(e)}")
                     break
                 except ValueError as e:
                     pretty_print(f"Failed to parse JSON response: {str(e)}", color="failure")
+                    print(f"CLIENT DEBUG ERROR: JSON parse error: {str(e)}")
                     break
                 except Exception as e:
                     pretty_print(f"An error occurred: {str(e)}", color="failure")
+                    print(f"CLIENT DEBUG ERROR: General error: {str(e)}")
                     break
         except KeyError as e:
-            raise Exception(
-                f"{str(e)}\nError occured with server route. Are you using the correct address for the config.ini provider?") from e
+            error_msg = f"{str(e)}\nError occurred with server route. Are you using the correct address for the config.ini provider?"
+            print(f"CLIENT DEBUG ERROR: KeyError: {error_msg}")
+            raise Exception(error_msg) from e
         except Exception as e:
+            print(f"CLIENT DEBUG ERROR: Unhandled exception: {str(e)}")
             raise e
+            
+        print(f"CLIENT DEBUG: Returning thought: '{thought}'")
         return thought
 
     def ollama_fn(self, history, verbose=False):

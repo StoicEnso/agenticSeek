@@ -169,12 +169,27 @@ class Agent():
         """
         Ask the LLM to process the prompt and return the answer and the reasoning.
         """
+        print("AGENT DEBUG: Starting LLM request")
         memory = self.memory.get()
+        print(f"AGENT DEBUG: Memory retrieved with {len(memory)} items")
+        
         thought = self.llm.respond(memory, self.verbose)
-
+        print(f"AGENT DEBUG: Received thought from LLM: '{thought}'")
+        
         reasoning = self.extract_reasoning_text(thought)
+        print(f"AGENT DEBUG: Extracted reasoning: '{reasoning}'")
+        
         answer = self.remove_reasoning_text(thought)
+        print(f"AGENT DEBUG: Extracted answer: '{answer}'")
+        
         self.memory.push('assistant', answer)
+        print("AGENT DEBUG: Pushed answer to memory")
+        
+        # Update instance variables
+        self.last_answer = answer
+        self.last_reasoning = reasoning
+        print(f"AGENT DEBUG: Updated last_answer: '{self.last_answer}'")
+        
         return answer, reasoning
     
     async def wait_message(self, speech_module):
@@ -212,15 +227,25 @@ class Agent():
         Show the answer in a pretty way.
         Show code blocks and their respective feedback by inserting them in the ressponse.
         """
+        print(f"AGENT DEBUG: show_answer called, last_answer: '{self.last_answer}'")
+        
         if self.last_answer is None:
+            print("AGENT DEBUG: last_answer is None, nothing to show")
             return
+            
+        print(f"AGENT DEBUG: Processing answer with length: {len(self.last_answer)}")
         lines = self.last_answer.split("\n")
+        
         for line in lines:
             if "block:" in line:
                 block_idx = int(line.split(":")[1])
+                print(f"AGENT DEBUG: Found block reference: {block_idx}")
                 if block_idx < len(self.blocks_result):
                     self.blocks_result[block_idx].show()
+                else:
+                    print(f"AGENT DEBUG: Block index {block_idx} out of range")
             else:
+                print(f"AGENT DEBUG: Printing line: '{line}'")
                 pretty_print(line, color="output")
 
     def remove_blocks(self, text: str) -> str:
