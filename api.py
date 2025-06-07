@@ -13,10 +13,11 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uuid
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 
 from sources.llm_provider import Provider
-from sources.interaction import Interaction
-from sources.agents import CasualAgent, CoderAgent, FileAgent, PlannerAgent, BrowserAgent
+from sources.agents import CasualAgent, CoderAgent, FileAgent, BrowserAgent, PlannerAgent
 from sources.browser import Browser, create_driver
 from sources.utility import pretty_print
 from sources.logger import Logger
@@ -26,12 +27,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
-from celery import Celery
-
 api = FastAPI(title="AgenticSeek API", version="0.1.0")
-celery_app = Celery("tasks", broker="redis://localhost:6379/0", backend="redis://localhost:6379/0")
-celery_app.conf.update(task_track_started=True)
 logger = Logger("backend.log")
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -61,12 +57,19 @@ def initialize_system():
     )
     logger.info(f"Provider initialized: {provider.provider_name} ({provider.model})")
 
-    browser = Browser(
-        create_driver(headless=config.getboolean('BROWSER', 'headless_browser'), stealth_mode=stealth_mode, lang=languages[0]),
-        anticaptcha_manual_install=stealth_mode
-    )
-    logger.info("Browser initialized")
+    # Try creating browser with our fixed approach
+    browser = None
+    try:
+        logger.info("Initializing Chrome browser with fixed settings...")
+        driver = create_driver(headless=False, stealth_mode=False)
+        browser = Browser(driver, anticaptcha_manual_install=False)
+        logger.info("Browser initialized successfully!")
+    except Exception as e:
+        logger.error(f"Browser initialization failed: {str(e)}")
+        pretty_print("Browser initialization failed. Running in browser-less mode.", color="warning")
+        browser = None
 
+    # Create all agents
     agents = [
         CasualAgent(
             name=config["MAIN"]["agent_name"],
@@ -82,28 +85,63 @@ def initialize_system():
             name="File Agent",
             prompt_path=f"prompts/{personality_folder}/file_agent.txt",
             provider=provider, verbose=False
-        ),
-        BrowserAgent(
-            name="Browser",
-            prompt_path=f"prompts/{personality_folder}/browser_agent.txt",
-            provider=provider, verbose=False, browser=browser
-        ),
-        PlannerAgent(
-            name="Planner",
-            prompt_path=f"prompts/{personality_folder}/planner_agent.txt",
-            provider=provider, verbose=False, browser=browser
         )
     ]
+    
+    # Only add browser-dependent agents if browser was initialized
+    if browser:
+        agents.extend([
+            BrowserAgent(
+                name="Browser",
+                prompt_path=f"prompts/{personality_folder}/browser_agent.txt",
+                provider=provider, verbose=False, browser=browser
+            ),
+            PlannerAgent(
+                name="Planner",
+                prompt_path=f"prompts/{personality_folder}/planner_agent.txt",
+                provider=provider, verbose=False, browser=browser
+            )
+        ])
+    
     logger.info("Agents initialized")
 
-    interaction = Interaction(
-        agents,
-        tts_enabled=config.getboolean('MAIN', 'speak'),
-        stt_enabled=config.getboolean('MAIN', 'listen'),
-        recover_last_session=config.getboolean('MAIN', 'recover_last_session'),
-        langs=languages
-    )
-    logger.info("Interaction initialized")
+    # Use simplified interaction without router
+    class SimpleInteraction:
+        def __init__(self, agents):
+            self.agents = agents
+            self.current_agent = agents[0] if agents else None
+            self.last_query = None
+            self.last_answer = None
+            self.last_reasoning = None
+            self.last_success = False
+            self.is_active = True
+            
+        async def think(self):
+            if not self.last_query:
+                return False
+                
+            # Always use the first agent (casual agent)
+            self.current_agent = self.agents[0]
+            self.last_answer, self.last_reasoning = await self.current_agent.process(self.last_query, None)
+            self.last_success = True if self.last_answer else False
+            return self.last_success
+            
+        def get_last_blocks_result(self):
+            if not self.current_agent:
+                return []
+            return self.current_agent.get_blocks_result()
+            
+        def speak_answer(self):
+            # No-op
+            pass
+            
+        def save_session(self):
+            # No-op
+            pass
+
+    interaction = SimpleInteraction(agents)
+    logger.info("Simple interaction initialized (router disabled)")
+            
     return interaction
 
 interaction = initialize_system()
@@ -135,7 +173,8 @@ async def is_active():
 @api.get("/stop")
 async def stop():
     logger.info("Stop endpoint called")
-    interaction.current_agent.request_stop()
+    if hasattr(interaction.current_agent, 'request_stop'):
+        interaction.current_agent.request_stop()
     return JSONResponse(status_code=200, content={"status": "stopped"})
 
 @api.get("/latest_answer")
@@ -150,9 +189,9 @@ async def get_latest_answer():
             "answer": interaction.current_agent.last_answer,
             "reasoning": interaction.current_agent.last_reasoning,
             "agent_name": interaction.current_agent.agent_name if interaction.current_agent else "None",
-            "success": interaction.current_agent.success,
+            "success": interaction.current_agent.success if hasattr(interaction.current_agent, 'success') else False,
             "blocks": {f'{i}': block.jsonify() for i, block in enumerate(interaction.get_last_blocks_result())} if interaction.current_agent else {},
-            "status": interaction.current_agent.get_status_message if interaction.current_agent else "No status available",
+            "status": interaction.current_agent.get_status_message if hasattr(interaction.current_agent, 'get_status_message') else "No status available",
             "uid": uid
         }
         interaction.current_agent.last_answer = ""
@@ -256,4 +295,4 @@ if __name__ == "__main__":
         port = int(envport)
     else:
         port = 8000
-    uvicorn.run(api, host="0.0.0.0", port=8000)
+    uvicorn.run(api, host="0.0.0.0", port=port)

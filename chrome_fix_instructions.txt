@@ -1,0 +1,27 @@
+# Chrome Fix Instructions
+
+Add these lines to the top of sources/browser.py:
+
+```python
+# Fix macOS SSL certificate issues
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+```
+
+Replace create_driver function with:
+
+```python
+def create_driver(headless=False, stealth_mode=True, crx_path='./crx/nopecha.crx', lang='en'):
+    # Create options with minimal settings for macOS
+    options = Options()
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
+    options.add_argument(f'--user-data-dir={tempfile.mkdtemp(prefix="chrome_profile_")}')
+    options.add_argument('--disable-blink-features=AutomationControlled')
+    options.add_experimental_option('excludeSwitches', ['enable-automation'])
+    options.add_experimental_option('useAutomationExtension', False)
+
+    # Try to create browser without explicit ChromeDriver
+    return webdriver.Chrome(options=options)
+```

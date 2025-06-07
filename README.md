@@ -263,7 +263,7 @@ Here are some example usage:
 
 > *Write a Go program to calculate the factorial of a number, save it as factorial.go in your workspace*
 
-> *Search my summer_pictures folder for all JPG files, rename them with today’s date, and save a list of renamed files in photos_list.txt*
+> *Search my summer_pictures folder for all JPG files, rename them with today's date, and save a list of renamed files in photos_list.txt*
 
 > *Search online for popular sci-fi movies from 2024 and pick three to watch tonight. Save the list in movie_night.txt.*
 
@@ -500,6 +500,32 @@ Maybe you didn't move `.env.example` as `.env` ? You can also export SEARXNG_BAS
 
 `export  SEARXNG_BASE_URL="http://127.0.0.1:8080"`
 
+## macOS Chrome Troubleshooting
+
+If you encounter Chrome initialization issues on macOS (like "session not created from disconnected: unable to connect to renderer"), try the following:
+
+1. Run the Chrome troubleshooting script to automatically diagnose and fix issues:
+   ```
+   python chrome_troubleshoot.py
+   ```
+   This script will check your Chrome installation, test different configurations, and apply fixes if needed.
+
+2. Update your Chrome browser to the latest version
+
+3. Set `headless_browser = False` in the `config.ini` file
+
+4. Run the `api_init_test.py` script to test Chrome initialization:
+   ```
+   python api_init_test.py
+   ```
+
+5. If problems persist, try running the API with:
+   ```
+   python api.py
+   ```
+
+The latest version includes fixes for Chrome browser initialization on macOS, addressing SSL certificate verification issues and simplifying browser options.
+
 ## FAQ
 
 **Q: What hardware do I need?**  
@@ -513,7 +539,7 @@ Maybe you didn't move `.env.example` as `.env` ? You can also export SEARXNG_BAS
 
 **Q: Why Deepseek R1 over other models?**  
 
-Deepseek R1 excels at reasoning and tool use for its size. We think it’s a solid fit for our needs other models work fine, but Deepseek is our primary pick.
+Deepseek R1 excels at reasoning and tool use for its size. We think it's a solid fit for our needs other models work fine, but Deepseek is our primary pick.
 
 **Q: I get an error running `cli.py`. What do I do?**  
 
@@ -525,13 +551,13 @@ Yes with Ollama, lm-studio or server providers, all speech to text, LLM and text
 
 **Q: Why should I use AgenticSeek when I have Manus?**
 
-This started as Side-Project we did out of interest about AI agents. What’s special about it is that we want to use local model and avoid APIs.
+This started as Side-Project we did out of interest about AI agents. What's special about it is that we want to use local model and avoid APIs.
 We draw inspiration from Jarvis and Friday (Iron man movies) to make it "cool" but for functionality we take more inspiration from Manus, because that's what people want in the first place: a local manus alternative.
 Unlike Manus, AgenticSeek prioritizes independence from external systems, giving you more control, privacy and avoid api cost.
 
 ## Contribute
 
-We’re looking for developers to improve AgenticSeek! Check out open issues or discussion.
+We're looking for developers to improve AgenticSeek! Check out open issues or discussion.
 
 [Contribution guide](./docs/CONTRIBUTING.md)
 

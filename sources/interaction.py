@@ -1,4 +1,5 @@
 import readline
+import configparser
 from typing import List, Tuple, Type, Dict
 
 from sources.text_to_speech import Speech
@@ -27,7 +28,24 @@ class Interaction:
         self.tts_enabled = tts_enabled
         self.stt_enabled = stt_enabled
         self.recover_last_session = recover_last_session
-        self.router = AgentRouter(self.agents, supported_language=langs)
+        
+        # Check if router should be used
+        config = configparser.ConfigParser()
+        config.read('config.ini')
+        use_router = config.getboolean('MAIN', 'use_router', fallback=False)
+        
+        if use_router:
+            try:
+                self.router = AgentRouter(self.agents, supported_language=langs)
+                pretty_print("Router initialized successfully", color="success")
+            except Exception as e:
+                pretty_print(f"Failed to initialize router: {str(e)}", color="failure")
+                pretty_print("Continuing without router. Will use default agent.", color="warning")
+                self.router = None
+        else:
+            pretty_print("Router disabled in config. Using default agent selection.", color="status")
+            self.router = None
+            
         self.ai_name = self.find_ai_name()
         self.speech = None
         self.transcriber = None
@@ -151,9 +169,23 @@ class Interaction:
         push_last_agent_memory = False
         if self.last_query is None or len(self.last_query) == 0:
             return False
-        agent = self.router.select_agent(self.last_query)
+            
+        # Select agent - either through router or default to first agent
+        if self.router:
+            agent = self.router.select_agent(self.last_query)
+        else:
+            # Default to first casual agent or just first agent if no casual agent
+            agent = None
+            for a in self.agents:
+                if a.type == "casual_agent":
+                    agent = a
+                    break
+            if agent is None and len(self.agents) > 0:
+                agent = self.agents[0]
+                
         if agent is None:
             return False
+            
         if self.current_agent != agent and self.last_answer is not None:
             push_last_agent_memory = True
         tmp = self.last_answer

@@ -25,6 +25,9 @@ import markdownify
 import sys
 import re
 
+# Fix macOS SSL certificate issues
+ssl._create_default_https_context = ssl._create_unverified_context
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sources.utility import pretty_print, animate_thinking
@@ -121,90 +124,40 @@ def create_undetected_chromedriver(service, chrome_options) -> webdriver.Chrome:
 
 def create_driver(headless=False, stealth_mode=True, crx_path="./crx/nopecha.crx", lang="en") -> webdriver.Chrome:
     """Create a Chrome WebDriver with specified options."""
-    chrome_options = Options()
-    chrome_path = get_chrome_path()
+    # Create options with minimal settings for macOS
+    options = Options()
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument(f"--user-data-dir={tempfile.mkdtemp(prefix='chrome_profile_')}")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
     
-    if not chrome_path:
-        raise FileNotFoundError("Google Chrome not found. Please install it.")
-    chrome_options.binary_location = chrome_path
+    # Add basic user agent
+    options.add_argument("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36")
     
-    if headless:
-        #chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--headless=new")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--disable-webgl")
-    user_data_dir = tempfile.mkdtemp()
-    user_agent = get_random_user_agent()
-    width, height = (1920, 1080)
-    user_data_dir = tempfile.mkdtemp(prefix="chrome_profile_")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    profile_dir = f"/tmp/chrome_profile_{uuid.uuid4().hex[:8]}"
-    chrome_options.add_argument(f'--user-data-dir={profile_dir}')
-    chrome_options.add_argument(f"--accept-lang={lang}-{lang.upper()},{lang};q=0.9")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-background-timer-throttling")
-    chrome_options.add_argument("--timezone=Europe/Paris")
-    chrome_options.add_argument('--remote-debugging-port=9222')
-    chrome_options.add_argument('--disable-background-timer-throttling')
-    chrome_options.add_argument('--disable-backgrounding-occluded-windows')
-    chrome_options.add_argument('--disable-renderer-backgrounding')
-    chrome_options.add_argument('--disable-features=TranslateUI')
-    chrome_options.add_argument('--disable-ipc-flooding-protection')
-    chrome_options.add_argument("--mute-audio")
-    chrome_options.add_argument("--disable-notifications")
-    chrome_options.add_argument("--autoplay-policy=user-gesture-required")
-    chrome_options.add_argument("--disable-features=SitePerProcess,IsolateOrigins")
-    chrome_options.add_argument("--enable-features=NetworkService,NetworkServiceInProcess")
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    chrome_options.add_argument(f'user-agent={user_agent["ua"]}')
-    chrome_options.add_argument(f'--window-size={width},{height}')
-    if not stealth_mode:
-        if not os.path.exists(crx_path):
-            pretty_print(f"Anti-captcha CRX not found at {crx_path}.", color="failure")
-        else:
-            chrome_options.add_extension(crx_path)
-
-    chromedriver_path = install_chromedriver()
-
-    service = Service(chromedriver_path)
-    if stealth_mode:
-        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-        driver = create_undetected_chromedriver(service, chrome_options)
-        chrome_version = driver.capabilities['browserVersion']
-        stealth(driver,
-            languages=["en-US", "en"],
-            vendor=user_agent["vendor"],
-            platform="Win64" if "windows" in user_agent["ua"].lower() else "MacIntel" if "mac" in user_agent["ua"].lower() else "Linux x86_64",
-            webgl_vendor="Intel Inc.",
-            renderer="Intel Iris OpenGL Engine",
-            fix_hairline=True,
-        )
+    pretty_print("Initializing Chrome browser with minimal settings...", color="status")
+    
+    # Try to create browser without explicit ChromeDriver
+    try:
+        driver = webdriver.Chrome(options=options)
+        pretty_print("Chrome initialized successfully!", color="success")
         return driver
-    security_prefs = {
-        "profile.default_content_setting_values.geolocation": 0,
-        "profile.default_content_setting_values.notifications": 0,
-        "profile.default_content_setting_values.camera": 0,
-        "profile.default_content_setting_values.microphone": 0,
-        "profile.default_content_setting_values.midi_sysex": 0,
-        "profile.default_content_setting_values.clipboard": 0,
-        "profile.default_content_setting_values.media_stream": 0,
-        "profile.default_content_setting_values.background_sync": 0,
-        "profile.default_content_setting_values.sensors": 0,
-        "profile.default_content_setting_values.accessibility_events": 0,
-        "safebrowsing.enabled": True,
-        "credentials_enable_service": False,
-        "profile.password_manager_enabled": False,
-        "webkit.webprefs.accelerated_2d_canvas_enabled": True,
-        "webkit.webprefs.force_dark_mode_enabled": False,
-        "webkit.webprefs.accelerated_2d_canvas_msaa_sample_count": 4,
-        "enable_webgl": True,
-        "enable_webgl2_compute_context": True
-    }
-    chrome_options.add_experimental_option("prefs", security_prefs)
-    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    chrome_options.add_experimental_option('useAutomationExtension', False)
-    return webdriver.Chrome(service=service, options=chrome_options)
+    except Exception as e:
+        pretty_print(f"Standard Chrome initialization failed: {str(e)}", color="warning")
+        
+        # Try with chromedriver_autoinstaller as fallback
+        try:
+            pretty_print("Trying with ChromeDriver autoinstaller...", color="status")
+            chromedriver_path = chromedriver_autoinstaller.install()
+            service = Service(chromedriver_path)
+            driver = webdriver.Chrome(service=service, options=options)
+            pretty_print("Chrome initialized with ChromeDriver autoinstaller!", color="success")
+            return driver
+        except Exception as e2:
+            pretty_print(f"All Chrome initialization attempts failed: {str(e2)}", color="failure")
+            raise e
 
 class Browser:
     def __init__(self, driver, anticaptcha_manual_install=False):
